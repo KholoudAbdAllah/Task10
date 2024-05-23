@@ -1,0 +1,112 @@
+import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Employee Manager',
+      home: HomePage(),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final TextEditingController _nameController = TextEditingController();
+  List<String> _employees = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmployees();
+  }
+
+  Future<void> _loadEmployees() async {
+    final database = await openDatabase(
+      join(await getDatabasesPath(), 'employees.db'),
+      onCreate: (db, version) {
+        return db.execute(
+          'CREATE TABLE employees(id INTEGER PRIMARY KEY, name TEXT)',
+        );
+      },
+      version: 1,
+    );
+
+    final List<Map<String, dynamic>> maps = await database.query('employees');
+
+    setState(() {
+      _employees = List.generate(maps.length, (i) {
+        return maps[i]['name'] as String;
+      });
+    });
+
+    await database.close();
+  }
+
+  Future<void> _addEmployee() async {
+    final database = await openDatabase(
+      join(await getDatabasesPath(), 'employees.db'),
+      version: 1,
+    );
+
+    await database.insert(
+      'employees',
+      {'name': _nameController.text},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    setState(() {
+      _employees.add(_nameController.text);
+      _nameController.clear();
+    });
+
+    await database.close();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Employee Manager'),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                hintText: 'Enter employee name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _addEmployee,
+            child: Text('Add Employee'),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _employees.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(_employees[index]),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
